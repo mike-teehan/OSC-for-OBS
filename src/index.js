@@ -34,6 +34,7 @@ let windowSizeWidthPre = 240
 let windowSizeWidthPost = 500
 let windowSizelHeight = 625
 let loadDelay = 1500
+let dmxMappings = []
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
 if (require('electron-squirrel-startup')) { // eslint-disable-line global-require
@@ -688,6 +689,44 @@ let oscPortOut = 53000;
 let oscOutPrefix = "/cue/"
 let oscOutSuffix = "/start"
 
+// DMX Mapping Functions
+function loadDMXMapping() {
+    try {
+        const mappingPath = path.join(__dirname, 'dmx_mapping.json');
+        // Check if file exists before trying to read
+        if (!fs.existsSync(mappingPath)) {
+            dmxMappings = [];
+            return;
+        }
+        const fileContent = fs.readFileSync(mappingPath, {encoding: 'utf8'});
+        const mappingData = JSON.parse(fileContent);
+        dmxMappings = mappingData.dmxMappings || [];
+        console.log(`Loaded ${dmxMappings.length} DMX mappings`);
+        logEverywhere(`Loaded ${dmxMappings.length} DMX mappings from dmx_mapping.json`);
+    } catch (err) {
+        console.log("Error loading dmx_mapping.json: " + err.message);
+        logEverywhere("Error loading dmx_mapping.json: " + err.message);
+        dmxMappings = [];
+    }
+}
+
+// Watch for changes to dmx_mapping.json (only if file exists)
+function setupDMXMappingWatcher() {
+    const mappingPath = path.join(__dirname, 'dmx_mapping.json');
+    if (!fs.existsSync(mappingPath)) {
+        return;
+    }
+    fs.watchFile(mappingPath, (curr, prev) => {
+        if (curr.mtime !== prev.mtime) {
+            loadDMXMapping();
+        }
+    });
+}
+
+// Load DMX mapping and set up file watcher
+loadDMXMapping();
+setupDMXMappingWatcher();
+
 
 //Connect to OBS
 ipcMain.on("obsConnect", (event, data) => {
@@ -931,6 +970,37 @@ server.on('bundle', function (bundle) {
 //OSC -> OBS
 //When app receives OSC do..
 server.on('message', (msg) => {
+    
+    // Handle DMX Channel + Value to Scene mapping (highest priority)
+    if (dmxMappings.length > 0 && msg[0] === "/scene" && typeof msg[1] === 'number' && typeof msg[2] === 'number') {
+        const dmxChannel = Math.floor(msg[1]);
+        const dmxValue = Math.floor(msg[2]);
+        
+        // Validate DMX ranges (0-255)
+        if (dmxChannel < 0 || dmxChannel > 255 || dmxValue < 0 || dmxValue > 255) {
+            console.log(`DMX out of range: channel=${dmxChannel}, value=${dmxValue}`);
+            logEverywhere(`DMX out of range: channel=${dmxChannel}, value=${dmxValue}. Valid range is 0-255.`);
+            return;
+        }
+        
+        // Look up mapping
+        const mapping = dmxMappings.find(m => m.dmxChannel === dmxChannel && m.dmxValue === dmxValue);
+        
+        if (mapping) {
+            console.log(`OSC IN: /scene ${dmxChannel} ${dmxValue} -> ${mapping.sceneName}`);
+            logEverywhere(`OSC IN: /scene ${dmxChannel} ${dmxValue} -> ${mapping.sceneName}`);
+            obs.call("SetCurrentProgramScene", {
+                'sceneName': mapping.sceneName
+            }).catch(() => {
+                console.log(`Error: There is no Scene "${mapping.sceneName}" in OBS. Double check case sensitivity.`);
+                logEverywhere(`Error: There is no Scene "${mapping.sceneName}" in OBS. Double check case sensitivity.\nOSC Received: ${msg}`);
+            });
+        } else {
+            console.log(`No DMX mapping found for channel=${dmxChannel}, value=${dmxValue}`);
+            logEverywhere(`No DMX mapping found for channel=${dmxChannel}, value=${dmxValue}`);
+        }
+        return;
+    }
     
     //Trigger Scene by Index Number
     if (msg[0] === "/scene" && typeof msg[1] === 'number'){ 

@@ -82,7 +82,27 @@ Value `0` to `1`
    - *Example:* `/scene/Wide` and a value of `0` to `1` will activate the scene "Wide" in OBS
    - *Note:* If a scene name contains a SPACE, replace with "_", so if OBS has a scene "Webcam 1" make OSC message: `/scene/Webcam_1`
    - See "OBS -> Application" for feedback of active scenes
-  
+
+### by DMX Channel and Value
+**`/scene [dmx_channel] [dmx_value]`**
+- activate a scene by DMX channel and value mapping defined in `dmx_mapping.json`
+- *Setup:* Copy `dmx_mapping.json.example` to `dmx_mapping.json` in the app's `src/` folder and edit with your mappings
+- *Example:* `/scene 0 128` will activate the scene mapped to DMX channel 0, value 128
+- DMX Channel range: `0` to `255`
+- DMX Value range: `0` to `255`
+- *Note:* The `dmx_mapping.json` file is automatically reloaded when modified (no restart needed)
+- *Note:* If no mapping is found for the channel/value combination, a log message is displayed
+- *Example dmx_mapping.json:*
+  ```json
+  {
+    "dmxMappings": [
+      { "dmxChannel": 0, "dmxValue": 128, "sceneName": "Scene One" },
+      { "dmxChannel": 0, "dmxValue": 200, "sceneName": "Scene Two" },
+      { "dmxChannel": 1, "dmxValue": 50, "sceneName": "Scene Three" }
+    ]
+  }
+  ```
+
 ### Next Scene
 **`/go`**  
 - activates the next scene in the list, if this is triggered on the last scene it will go to the first scene

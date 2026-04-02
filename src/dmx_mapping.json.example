@@ -1,0 +1,24 @@
+{
+  "dmxMappings": [
+    {
+      "dmxChannel": 0,
+      "dmxValue": 128,
+      "sceneName": "Scene One"
+    },
+    {
+      "dmxChannel": 0,
+      "dmxValue": 200,
+      "sceneName": "Scene Two"
+    },
+    {
+      "dmxChannel": 1,
+      "dmxValue": 50,
+      "sceneName": "Scene Three"
+    },
+    {
+      "dmxChannel": 2,
+      "dmxValue": 255,
+      "sceneName": "Scene Four"
+    }
+  ]
+}
