@@ -972,9 +972,26 @@ server.on('bundle', function (bundle) {
 server.on('message', (msg) => {
     
     // Handle DMX Channel + Value to Scene mapping (highest priority)
-    if (dmxMappings.length > 0 && msg[0] === "/scene" && typeof msg[1] === 'number' && typeof msg[2] === 'number') {
-        const dmxChannel = Math.floor(msg[1]);
-        const dmxValue = Math.floor(msg[2]);
+    // Expected format: /[universe]/dmx/[channel] with value as argument
+    // Example: /1/dmx/50 [128] means Universe 1, Channel 50, Value 128
+    if (dmxMappings.length > 0 && msg[0] && typeof msg[0] === 'string' && msg[0].match(/^\/\d+\/dmx\/\d+$/)) {
+        const addressParts = msg[0].split('/');
+        // addressParts[0] = '' (empty due to leading /)
+        // addressParts[1] = universe number
+        // addressParts[2] = 'dmx'
+        // addressParts[3] = channel number
+        
+        // qLC+ uses 0-based indexing, add 1 to get actual universe/channel numbers
+        const dmxUniverse = parseInt(addressParts[1], 10) + 1;
+        const dmxChannel = parseInt(addressParts[3], 10) + 1;
+        let dmxValue = 0;
+        if (typeof msg[1] === 'number') {
+            // qLC+ sends normalized float (0.0-1.0), convert to DMX value (0-255)
+            dmxValue = Math.floor(msg[1] * 255);
+        }
+        
+        // TODO: Use dmxUniverse for multi-universe support in the future
+        console.log(`DMX OSC received: universe=${dmxUniverse}, channel=${dmxChannel}, value=${dmxValue}`);
         
         // Validate DMX ranges (0-255)
         if (dmxChannel < 0 || dmxChannel > 255 || dmxValue < 0 || dmxValue > 255) {
@@ -987,8 +1004,8 @@ server.on('message', (msg) => {
         const mapping = dmxMappings.find(m => m.dmxChannel === dmxChannel && m.dmxValue === dmxValue);
         
         if (mapping) {
-            console.log(`OSC IN: /scene ${dmxChannel} ${dmxValue} -> ${mapping.sceneName}`);
-            logEverywhere(`OSC IN: /scene ${dmxChannel} ${dmxValue} -> ${mapping.sceneName}`);
+            console.log(`OSC IN: ${msg[0]} ${dmxValue} -> ${mapping.sceneName}`);
+            logEverywhere(`OSC IN: ${msg[0]} ${dmxValue} -> ${mapping.sceneName}`);
             obs.call("SetCurrentProgramScene", {
                 'sceneName': mapping.sceneName
             }).catch(() => {
